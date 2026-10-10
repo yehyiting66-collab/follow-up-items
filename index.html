@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全方位追蹤事項管理儀表板</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js 視覺化圖表 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Alpine.js 輕量前端狀態管理 -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        [x-cloak] { display: none !important; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen" x-data="dashboardApp()" x-init="initApp()">
+
+    <!-- Top Header -->
+    <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-list-check text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight">全方位追蹤事項管理儀表板</h1>
+                    <p class="text-xs text-slate-400">會議決議 ‧ 主管交辦 ‧ 待執行事項 跨單位追蹤</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button @click="openAddModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>新增追蹤事項</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-slate-800 border-t border-slate-700">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto space-x-1 py-1">
+                <button @click="activeTab = 'overview'" :class="activeTab === 'overview' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'" class="px-4 py-2.5 rounded-md text-sm transition flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>1. 管理總覽 & 7大KPI</span>
+                </button>
+                <button @click="activeTab = 'executive'" :class="activeTab === 'executive' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'" class="px-4 py-2.5 rounded-md text-sm transition flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>2. 主管重點追蹤 & 燈號預警</span>
+                </button>
+                <button @click="activeTab = 'masterTable'" :class="activeTab === 'masterTable' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'" class="px-4 py-2.5 rounded-md text-sm transition flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-table-list"></i>
+                    <span>3. 整合列管主資料庫</span>
+                </button>
+                <button @click="activeTab = 'summary'" :class="activeTab === 'summary' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'" class="px-4 py-2.5 rounded-md text-sm transition flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-calendar-day"></i>
+                    <span>4. 每日/每週管理摘要</span>
+                </button>
+                <button @click="activeTab = 'analytics'" :class="activeTab === 'analytics' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'" class="px-4 py-2.5 rounded-md text-sm transition flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-user"></i>
+                    <span>5. 單位與主管交叉分析</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- TAB 1: 管理總覽與 7 大 KPI 卡片 -->
+        <div x-show="activeTab === 'overview'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            
+            <!-- Global Controls / Filters -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">追蹤事項來源</label>
+                        <select x-model="overviewFilters.source" class="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="all">全部來源 (含會議/主管/待執行)</option>
+                            <option value="meeting">會議決議事項追蹤</option>
+                            <option value="executive">主管交辦事項</option>
+                            <option value="pending">待執行事項</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">主責/權責單位</label>
+                        <select x-model="overviewFilters.dept" class="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="all">所有單位</option>
+                            <template x-for="dept in departments" :key="dept">
+                                <option :value="dept" x-text="dept"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-info-circle text-indigo-500"></i>
+                    <span>點選下方任意 KPI 卡片可直接開啟該分類項目清單。</span>
+                </div>
+            </div>
+
+            <!-- 7 大 KPI 卡片 Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                <!-- 1. 列管總數 -->
+                <div @click="openKpiList('total')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-slate-600">
+                    <p class="text-xs font-medium text-slate-500">列管總數</p>
+                    <p class="text-2xl font-bold text-slate-800 mt-1" x-text="kpiStats.total"></p>
+                    <p class="text-[10px] text-slate-400 mt-1 flex items-center"><i class="fa-solid fa-folder-open mr-1"></i> 全部收錄案件</p>
+                </div>
+
+                <!-- 2. 已完成 -->
+                <div @click="openKpiList('completed')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-emerald-500">
+                    <p class="text-xs font-medium text-emerald-600">已完成</p>
+                    <p class="text-2xl font-bold text-emerald-700 mt-1" x-text="kpiStats.completed"></p>
+                    <p class="text-[10px] text-emerald-600/80 mt-1 flex items-center"><i class="fa-solid fa-circle-check mr-1"></i> 已結案事項</p>
+                </div>
+
+                <!-- 3. 進行中 -->
+                <div @click="openKpiList('inProgress')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-blue-500">
+                    <p class="text-xs font-medium text-blue-600">進行中</p>
+                    <p class="text-2xl font-bold text-blue-700 mt-1" x-text="kpiStats.inProgress"></p>
+                    <p class="text-[10px] text-blue-600/80 mt-1 flex items-center"><i class="fa-solid fa-spinner mr-1"></i> 按計畫執行中</p>
+                </div>
+
+                <!-- 4. 逾期 -->
+                <div @click="openKpiList('overdue')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-rose-500 bg-rose-50/20">
+                    <p class="text-xs font-medium text-rose-600">逾期</p>
+                    <p class="text-2xl font-bold text-rose-700 mt-1" x-text="kpiStats.overdue"></p>
+                    <p class="text-[10px] text-rose-600/80 mt-1 flex items-center"><i class="fa-solid fa-circle-exclamation mr-1"></i> 已超過預定日期</p>
+                </div>
+
+                <!-- 5. 7日內到期 -->
+                <div @click="openKpiList('due7Days')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-amber-500 bg-amber-50/20">
+                    <p class="text-xs font-medium text-amber-600">7日內到期</p>
+                    <p class="text-2xl font-bold text-amber-700 mt-1" x-text="kpiStats.due7Days"></p>
+                    <p class="text-[10px] text-amber-600/80 mt-1 flex items-center"><i class="fa-solid fa-clock mr-1"></i> 即將到期需急追</p>
+                </div>
+
+                <!-- 6. 待裁示 -->
+                <div @click="openKpiList('pendingReview')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-purple-500">
+                    <p class="text-xs font-medium text-purple-600">待裁示</p>
+                    <p class="text-2xl font-bold text-purple-700 mt-1" x-text="kpiStats.pendingReview"></p>
+                    <p class="text-[10px] text-purple-600/80 mt-1 flex items-center"><i class="fa-solid fa-user-clock mr-1"></i> 等待主管裁決</p>
+                </div>
+
+                <!-- 7. 本月新增 -->
+                <div @click="openKpiList('newThisMonth')" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md cursor-pointer transition transform hover:-translate-y-0.5 border-l-4 border-l-sky-500">
+                    <p class="text-xs font-medium text-sky-600">本月新增</p>
+                    <p class="text-2xl font-bold text-sky-700 mt-1" x-text="kpiStats.newThisMonth"></p>
+                    <p class="text-[10px] text-sky-600/80 mt-1 flex items-center"><i class="fa-solid fa-calendar-plus mr-1"></i> 當月新建管制項</p>
+                </div>
+            </div>
+
+            <!-- 第二區：狀態分布、趨勢與排行榜 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 1. 案件狀態環形圖 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-base font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-chart-donut text-indigo-500 mr-2"></i>
+                            案件狀態分布
+                        </h3>
+                    </div>
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="statusDonutChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 2. 近 6 個月新增 vs 完成趨勢圖 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-base font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-chart-line text-indigo-500 mr-2"></i>
+                            近 6 個月新增 vs 完成趨勢
+                        </h3>
+                    </div>
+                    <div class="relative h-64">
+                        <canvas id="trendLineChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 3. 各單位未完成件數排行 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center">
+                        <i class="fa-solid fa-list-ol text-amber-500 mr-2"></i>
+                        各單位「未完成」件數排行榜
+                    </h3>
+                    <div class="space-y-3">
+                        <template x-for="(item, idx) in deptUnfinishedRank" :key="item.dept">
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-slate-700" x-text="`${idx+1}. ${item.dept}`"></span>
+                                    <span class="text-amber-600" x-text="`${item.count} 件`"></span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                    <div class="bg-amber-500 h-2.5 rounded-full transition-all duration-500" :style="`width: ${item.percentage}%`"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 4. 各單位逾期件數排行 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-500 mr-2"></i>
+                        各單位「逾期」件數排行榜
+                    </h3>
+                    <div class="space-y-3">
+                        <template x-for="(item, idx) in deptOverdueRank" :key="item.dept">
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-slate-700" x-text="`${idx+1}. ${item.dept}`"></span>
+                                    <span class="text-rose-600" x-text="`${item.count} 件`"></span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                    <div class="bg-rose-500 h-2.5 rounded-full transition-all duration-500" :style="`width: ${item.percentage}%`"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: 主管重點追蹤與自動燈號預警 -->
+        <div x-show="activeTab === 'executive'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-lightbulb text-amber-500 mr-2"></i>
+                            主管重點追蹤與自動燈號預警
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-1">即時根據預定提報日期與辦理狀態自動判讀燈號，提供主管快速精準決策。</p>
+                    </div>
+
+                    <!-- 篩選選單 -->
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">交辦主管</label>
+                            <select x-model="execFilters.assignee" class="bg-slate-50 border border-slate-300 text-xs rounded-lg p-2 focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">所有主管</option>
+                                <template x-for="exec in executivesList" :key="exec">
+                                    <option :value="exec" x-text="exec"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">主責單位</label>
+                            <select x-model="execFilters.dept" class="bg-slate-50 border border-slate-300 text-xs rounded-lg p-2 focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">所有單位</option>
+                                <template x-for="dept in departments" :key="dept">
+                                    <option :value="dept" x-text="dept"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">預警燈號</label>
+                            <select x-model="execFilters.light" class="bg-slate-50 border border-slate-300 text-xs rounded-lg p-2 focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">全部燈號</option>
+                                <option value="red">🔴 逾期</option>
+                                <option value="orange">🟠 7日內到期</option>
+                                <option value="yellow">🟡 待裁示</option>
+                                <option value="green">🟢 已完成</option>
+                                <option value="white">⚪ 尚未啟動</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 燈號說明標籤列 -->
+                <div class="flex flex-wrap items-center gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <span class="font-bold text-slate-600">自動預警燈號說明：</span>
+                    <span class="inline-flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span><span class="font-medium text-slate-700">🔴 逾期</span></span>
+                    <span class="inline-flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span><span class="font-medium text-slate-700">🟠 7日內到期</span></span>
+                    <span class="inline-flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span><span class="font-medium text-slate-700">🟡 待裁示/待主管確認</span></span>
+                    <span class="inline-flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span><span class="font-medium text-slate-700">🟢 已完成</span></span>
+                    <span class="inline-flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-slate-300 border border-slate-400 inline-block"></span><span class="font-medium text-slate-700">⚪ 尚未啟動</span></span>
+                </div>
+            </div>
+
+            <!-- Focus List Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-600">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3 text-center">燈號預警</th>
+                                <th class="px-4 py-3">來源 / 單號</th>
+                                <th class="px-4 py-3">事項摘要與決議/交辦</th>
+                                <th class="px-4 py-3">交辦主管 / 來源</th>
+                                <th class="px-4 py-3">主責/協辦單位</th>
+                                <th class="px-4 py-3">預定到期日</th>
+                                <th class="px-4 py-3">最新更新紀錄</th>
+                                <th class="px-4 py-3 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            <template x-for="item in filteredExecItems" :key="item.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <!-- 燈號 -->
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold shadow-xs" :class="getLightBadgeClass(item)">
+                                            <span class="w-2 h-2 rounded-full mr-1.5" :class="getLightDotClass(item)"></span>
+                                            <span x-text="getLightLabel(item)"></span>
+                                        </span>
+                                    </td>
+                                    <!-- 來源與編號 -->
+                                    <td class="px-4 py-3">
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded" :class="getSourceBadgeClass(item.type)" x-text="getSourceLabel(item.type)"></span>
+                                        <div class="text-xs text-slate-400 mt-1" x-text="item.id"></div>
+                                    </td>
+                                    <!-- 事項內容 -->
+                                    <td class="px-4 py-3 max-w-xs">
+                                        <div class="font-semibold text-slate-800 line-clamp-2" x-text="item.title"></div>
+                                        <div class="text-xs text-slate-500 line-clamp-1 mt-0.5" x-text="item.detail"></div>
+                                    </td>
+                                    <!-- 主管 / 來源 -->
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <div class="font-medium text-slate-700" x-text="item.assignedBy || item.sourceContact || '一律管轄'"></div>
+                                    </td>
+                                    <!-- 單位 -->
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <div class="font-bold text-slate-800" x-text="item.leadDept"></div>
+                                        <div class="text-xs text-slate-400" x-text="item.coDept ? '協: ' + item.coDept : ''"></div>
+                                    </td>
+                                    <!-- 預定日期 -->
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <div class="font-semibold" :class="isOverdue(item) ? 'text-rose-600 font-bold' : 'text-slate-700'" x-text="item.targetDate"></div>
+                                        <div class="text-[10px] text-slate-400" x-text="getDaysRemainingText(item.targetDate)"></div>
+                                    </td>
+                                    <!-- 最新更新 -->
+                                    <td class="px-4 py-3 max-w-xs">
+                                        <template x-if="item.updates && item.updates.length > 0">
+                                            <div>
+                                                <div class="text-xs text-slate-700 line-clamp-1" x-text="item.updates[item.updates.length-1].content"></div>
+                                                <div class="text-[10px] text-slate-400 flex items-center space-x-2 mt-0.5">
+                                                    <span x-text="item.updates[item.updates.length-1].date"></span>
+                                                    <span x-text="`(${item.updates[item.updates.length-1].updater})`"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="!item.updates || item.updates.length === 0">
+                                            <span class="text-xs text-slate-400 italic">尚無進度回覆</span>
+                                        </template>
+                                    </td>
+                                    <!-- 操作 -->
+                                    <td class="px-4 py-3 text-center whitespace-nowrap">
+                                        <button @click="openLogModal(item)" class="text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition">
+                                            <i class="fa-solid fa-pen-to-square mr-1"></i>更新履歷
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: 整合列管主資料表 -->
+        <div x-show="activeTab === 'masterTable'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            <!-- Filter & Search Bar -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Search Keyword -->
+                        <div class="relative min-w-[240px]">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                            <input type="text" x-model="masterFilters.keyword" placeholder="搜尋標題、決議、與會人員..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 text-xs rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+
+                        <!-- Source Filter -->
+                        <select x-model="masterFilters.source" class="bg-slate-50 border border-slate-300 text-xs text-slate-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">所有來源 (全部)</option>
+                            <option value="meeting">會議決議事項</option>
+                            <option value="executive">主管交辦事項</option>
+                            <option value="pending">待執行事項</option>
+                        </select>
+
+                        <!-- Dept Filter -->
+                        <select x-model="masterFilters.dept" class="bg-slate-50 border border-slate-300 text-xs text-slate-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">所有單位</option>
+                            <template x-for="dept in departments" :key="dept">
+                                <option :value="dept" x-text="dept"></option>
+                            </template>
+                        </select>
+
+                        <!-- Status Filter -->
+                        <select x-model="masterFilters.status" class="bg-slate-50 border border-slate-300 text-xs text-slate-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">所有狀態</option>
+                            <option value="進行中">進行中</option>
+                            <option value="待裁示">待裁示</option>
+                            <option value="已完成">已完成</option>
+                            <option value="尚未啟動">尚未啟動</option>
+                        </select>
+                    </div>
+
+                    <div class="text-xs text-slate-500">
+                        共檢索到 <span class="font-bold text-indigo-600" x-text="filteredMasterItems.length"></span> 筆資料
+                    </div>
+                </div>
+            </div>
+
+            <!-- Master Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left text-slate-600">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b border-slate-200">
+                            <tr>
+                                <th class="px-3 py-3">來源 / 案號</th>
+                                <th class="px-3 py-3">日期 / 交辦者 / 來源管道</th>
+                                <th class="px-3 py-3">內容 / 討論 / 決議事項</th>
+                                <th class="px-3 py-3">主責單位</th>
+                                <th class="px-3 py-3">協辦單位</th>
+                                <th class="px-3 py-3">預定到期日</th>
+                                <th class="px-3 py-3">目前狀態</th>
+                                <th class="px-3 py-3">進度紀錄 (歷次回覆)</th>
+                                <th class="px-3 py-3 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            <template x-for="item in filteredMasterItems" :key="item.id">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <!-- 來源/案號 -->
+                                    <td class="px-3 py-3 font-medium">
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded" :class="getSourceBadgeClass(item.type)" x-text="getSourceLabel(item.type)"></span>
+                                        <div class="text-slate-800 font-mono font-semibold mt-1" x-text="item.id"></div>
+                                    </td>
+                                    <!-- 日期與相關資訊 -->
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <div class="font-semibold text-slate-700" x-text="item.startDate"></div>
+                                        <div class="text-slate-500 text-[10px]" x-text="item.type === 'meeting' ? '與會: ' + (item.attendees || '無') : (item.assignedBy ? '主管: ' + item.assignedBy : '管道: ' + item.sourceType)"></div>
+                                    </td>
+                                    <!-- 內容事項 -->
+                                    <td class="px-3 py-3 max-w-xs">
+                                        <div class="font-bold text-slate-800" x-text="item.title"></div>
+                                        <div class="text-slate-500 line-clamp-2 mt-0.5" x-text="item.detail"></div>
+                                    </td>
+                                    <!-- 主責 -->
+                                    <td class="px-3 py-3 font-bold text-slate-800 whitespace-nowrap" x-text="item.leadDept"></td>
+                                    <!-- 協辦 -->
+                                    <td class="px-3 py-3 text-slate-500 whitespace-nowrap" x-text="item.coDept || '-'"></td>
+                                    <!-- 預定日期 -->
+                                    <td class="px-3 py-3 whitespace-nowrap font-medium" :class="isOverdue(item) ? 'text-rose-600 font-bold' : 'text-slate-700'" x-text="item.targetDate"></td>
+                                    <!-- 狀態 -->
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <span class="px-2 py-1 rounded text-[11px] font-bold" :class="getStatusStyle(item.status)" x-text="item.status"></span>
+                                    </td>
+                                    <!-- 歷次進度 -->
+                                    <td class="px-3 py-3 max-w-xs">
+                                        <div class="space-y-1">
+                                            <template x-for="log in item.updates" :key="log.id">
+                                                <div class="bg-slate-50 p-1.5 rounded border border-slate-100 text-[11px]">
+                                                    <span class="font-semibold text-indigo-600" x-text="log.date"></span>
+                                                    <span class="text-slate-500" x-text="`[${log.updater}]`"></span>: 
+                                                    <span class="text-slate-700" x-text="log.content"></span>
+                                                </div>
+                                            </template>
+                                            <template x-if="!item.updates || item.updates.length === 0">
+                                                <span class="text-slate-400 italic">無紀錄</span>
+                                            </template>
+                                        </div>
+                                    </td>
+                                    <!-- 操作按鈕 -->
+                                    <td class="px-3 py-3 text-center whitespace-nowrap space-x-1">
+                                        <button @click="openLogModal(item)" class="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50" title="登載/檢視進度">
+                                            <i class="fa-solid fa-comment-dots text-sm"></i>
+                                        </button>
+                                        <button @click="deleteItem(item.id)" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50" title="刪除案件">
+                                            <i class="fa-solid fa-trash-can text-sm"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: 自動產生每日管理摘要與每週追蹤摘要 -->
+        <div x-show="activeTab === 'summary'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            
+            <!-- Mode Switcher & Date Picker -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <button @click="summaryMode = 'daily'" :class="summaryMode === 'daily' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-4 py-2 rounded-lg text-sm transition">
+                        <i class="fa-solid fa-calendar-day mr-1.5"></i>每日管理摘要
+                    </button>
+                    <button @click="summaryMode = 'weekly'" :class="summaryMode === 'weekly' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-4 py-2 rounded-lg text-sm transition">
+                        <i class="fa-solid fa-calendar-week mr-1.5"></i>每週追蹤摘要
+                    </button>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <label class="text-xs font-bold text-slate-600">選擇基準日期：</label>
+                    <input type="date" x-model="selectedSummaryDate" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+
+            <!-- DAILY SUMMARY VIEW -->
+            <div x-show="summaryMode === 'daily'" class="space-y-6">
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-indigo-900" x-text="`📅 ${selectedSummaryDate} 每日管理彙總簡報`"></h3>
+                        <p class="text-xs text-indigo-700 mt-0.5">自動統計當日最新進度、逾期預警、久未更新(>14天)與新增完成案。</p>
+                    </div>
+                </div>
+
+                <!-- Daily Metric Cards (Clickable) -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                    <div @click="openSummaryModal('dailyUpdated', dailySummaryData.updatedItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-400">
+                        <p class="text-xs text-slate-500">當日更新案件</p>
+                        <p class="text-xl font-bold text-indigo-600 mt-1" x-text="dailySummaryData.updatedItems.length"></p>
+                    </div>
+                    <div @click="openSummaryModal('dailyOverdue', dailySummaryData.overdueItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-rose-400 bg-rose-50/20">
+                        <p class="text-xs text-rose-600">當日逾期案件</p>
+                        <p class="text-xl font-bold text-rose-700 mt-1" x-text="dailySummaryData.overdueItems.length"></p>
+                    </div>
+                    <div @click="openSummaryModal('dailyUpcoming', dailySummaryData.upcomingItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-amber-400 bg-amber-50/20">
+                        <p class="text-xs text-amber-600">近期(7日內)到期</p>
+                        <p class="text-xl font-bold text-amber-700 mt-1" x-text="dailySummaryData.upcomingItems.length"></p>
+                    </div>
+                    <div @click="openSummaryModal('dailyPending', dailySummaryData.pendingRulingItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-purple-400">
+                        <p class="text-xs text-purple-600">待裁示案件</p>
+                        <p class="text-xl font-bold text-purple-700 mt-1" x-text="dailySummaryData.pendingRulingItems.length"></p>
+                    </div>
+                    <div @click="openSummaryModal('dailyStale', dailySummaryData.staleItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-orange-400 bg-orange-50/20">
+                        <p class="text-xs text-orange-600 font-bold">⚠️ 久未更新(&gt;14天)</p>
+                        <p class="text-xl font-bold text-orange-700 mt-1" x-text="dailySummaryData.staleItems.length"></p>
+                    </div>
+                    <div @click="openSummaryModal('dailyNew', dailySummaryData.newItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-sky-400">
+                        <p class="text-xs text-sky-600">當日新增事項</p>
+                        <p class="text-xl font-bold text-sky-700 mt-1" x-text="dailySummaryData.newItems.length"></p>
+                    </div>
+                    <div @click="openSummaryModal('dailyCompleted', dailySummaryData.completedItems)" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-emerald-400">
+                        <p class="text-xs text-emerald-600">當日完成案件</p>
+                        <p class="text-xl font-bold text-emerald-700 mt-1" x-text="dailySummaryData.completedItems.length"></p>
+                    </div>
+                </div>
+
+                <!-- Daily Detailed Content Highlights -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 當日更新與執行摘要 -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <h4 class="text-sm font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-comments text-indigo-500 mr-2"></i>
+                            當日進度更新與執行摘要
+                        </h4>
+                        <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            <template x-for="item in dailySummaryData.updatedItems" :key="item.id">
+                                <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                                    <div class="flex justify-between font-bold text-slate-800">
+                                        <span x-text="item.title"></span>
+                                        <span class="text-indigo-600" x-text="item.leadDept"></span>
+                                    </div>
+                                    <template x-for="log in getLogsForDate(item, selectedSummaryDate)" :key="log.id">
+                                        <div class="mt-1.5 text-slate-600 bg-white p-2 rounded border border-slate-100">
+                                            <span class="font-semibold text-slate-700" x-text="`[${log.updater}]`"></span>: <span x-text="log.content"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="dailySummaryData.updatedItems.length === 0">
+                                <p class="text-xs text-slate-400 italic">當日尚無案件更新紀錄。</p>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- ⚠️ 久未更新 (>14天) 警示清單 -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <h4 class="text-sm font-bold text-rose-600 flex items-center">
+                            <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+                            久未更新案件警示 (&gt;14 天無回應)
+                        </h4>
+                        <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            <template x-for="item in dailySummaryData.staleItems" :key="item.id">
+                                <div class="p-3 bg-orange-50/40 rounded-lg border border-orange-200 text-xs flex justify-between items-center">
+                                    <div>
+                                        <div class="font-bold text-slate-800" x-text="item.title"></div>
+                                        <div class="text-[10px] text-slate-500" x-text="`主責: ${item.leadDept} | 預定: ${item.targetDate}`"></div>
+                                        <div class="text-[10px] text-orange-600 mt-0.5" x-text="`上次更新: ${getLastUpdateDate(item)}`"></div>
+                                    </div>
+                                    <button @click="openLogModal(item)" class="bg-orange-600 hover:bg-orange-500 text-white text-[10px] px-2.5 py-1 rounded">催辦更新</button>
+                                </div>
+                            </template>
+                            <template x-if="dailySummaryData.staleItems.length === 0">
+                                <p class="text-xs text-slate-400 italic">讚！目前無超過14天未更新之案件。</p>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WEEKLY SUMMARY VIEW -->
+            <div x-show="summaryMode === 'weekly'" class="space-y-6">
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-indigo-900" x-text="`📆 週追蹤摘要 (${weeklyRangeText})`"></h3>
+                        <p class="text-xs text-indigo-700 mt-0.5">自動以週一為起始日，週日為末日，計算本週新增事項與辦理完成全貌。</p>
+                    </div>
+                </div>
+
+                <!-- Weekly Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div @click="openSummaryModal('weeklyNew', weeklySummaryData.newItems)" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-400">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold text-slate-600">本週新增追蹤事項</span>
+                            <i class="fa-solid fa-plus-circle text-indigo-500 text-xl"></i>
+                        </div>
+                        <p class="text-3xl font-bold text-indigo-600 mt-2" x-text="weeklySummaryData.newItems.length"></p>
+                        <p class="text-xs text-slate-400 mt-1">點選查看完整案件清單</p>
+                    </div>
+
+                    <div @click="openSummaryModal('weeklyExec', weeklySummaryData.execLogs)" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-blue-400">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold text-slate-600">本週執行更新次數</span>
+                            <i class="fa-solid fa-list-check text-blue-500 text-xl"></i>
+                        </div>
+                        <p class="text-3xl font-bold text-blue-600 mt-2" x-text="weeklySummaryData.execLogs.length"></p>
+                        <p class="text-xs text-slate-400 mt-1">跨單位進度回覆總次數</p>
+                    </div>
+
+                    <div @click="openSummaryModal('weeklyCompleted', weeklySummaryData.completedItems)" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-emerald-400">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold text-slate-600">本週完成結案事項</span>
+                            <i class="fa-solid fa-square-check text-emerald-500 text-xl"></i>
+                        </div>
+                        <p class="text-3xl font-bold text-emerald-600 mt-2" x-text="weeklySummaryData.completedItems.length"></p>
+                        <p class="text-xs text-slate-400 mt-1">本週順利達成指標案件</p>
+                    </div>
+                </div>
+
+                <!-- Weekly Digest Content -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="text-base font-bold text-slate-800 border-b border-slate-200 pb-2">本週重要執行摘要總覽</h4>
+                    <div class="space-y-3">
+                        <template x-for="item in weeklySummaryData.activeWeeklyItems" :key="item.id">
+                            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="flex flex-wrap justify-between items-center gap-2">
+                                    <div class="font-bold text-slate-800 text-sm" x-text="item.title"></div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded" x-text="item.leadDept"></span>
+                                        <span class="text-xs px-2 py-0.5 rounded font-bold" :class="getStatusStyle(item.status)" x-text="item.status"></span>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-slate-600 space-y-1">
+                                    <template x-for="log in getLogsForWeek(item, selectedSummaryDate)" :key="log.id">
+                                        <div class="pl-3 border-l-2 border-indigo-400 py-0.5">
+                                            <span class="font-semibold text-slate-700" x-text="log.date + ' (' + log.updater + ')'"></span>: 
+                                            <span x-text="log.content"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: 單位與主管交叉分析 -->
+        <div x-show="activeTab === 'analytics'" x-transition:enter="transition ease-out duration-200" class="space-y-6">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                        <i class="fa-solid fa-chart-user text-indigo-500 mr-2"></i>
+                        單位與主管交叉分析
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">深入統計各單位及主管之完成率、逾期率與平均完成天數，輔助績效評估與資源調配。</p>
+                </div>
+            </div>
+
+            <!-- Analysis Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-600">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">權責單位</th>
+                                <th class="px-4 py-3 text-center">總交辦案件數</th>
+                                <th class="px-4 py-3 text-center">已完成數</th>
+                                <th class="px-4 py-3 text-center">逾期數</th>
+                                <th class="px-4 py-3 text-center">完成率 (%)</th>
+                                <th class="px-4 py-3 text-center">逾期率 (%)</th>
+                                <th class="px-4 py-3 text-center">平均完成天數 (天)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            <template x-for="row in crossAnalysisData" :key="row.dept">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-4 py-3 font-bold text-slate-800" x-text="row.dept"></td>
+                                    <td class="px-4 py-3 text-center font-semibold text-slate-700" x-text="row.total"></td>
+                                    <td class="px-4 py-3 text-center font-semibold text-emerald-600" x-text="row.completed"></td>
+                                    <td class="px-4 py-3 text-center font-semibold text-rose-600" x-text="row.overdue"></td>
+                                    <!-- 完成率 Progress -->
+                                    <td class="px-4 py-3 text-center">
+                                        <div class="flex items-center justify-center space-x-2">
+                                            <span class="font-bold text-slate-700" x-text="`${row.completionRate}%`"></span>
+                                            <div class="w-16 bg-slate-200 rounded-full h-2 overflow-hidden">
+                                                <div class="bg-emerald-500 h-2 rounded-full" :style="`width: ${row.completionRate}%`"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <!-- 逾期率 -->
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="font-bold px-2 py-0.5 rounded text-xs" :class="row.overdueRate > 20 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'" x-text="`${row.overdueRate}%`"></span>
+                                    </td>
+                                    <!-- 平均天數 -->
+                                    <td class="px-4 py-3 text-center font-medium text-slate-700" x-text="`${row.avgDays} 天`"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: 新增 / 編輯事項彈窗 -->
+    <div x-show="showAddModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800" x-text="form.id ? '編輯追蹤事項' : '新增追蹤事項'"></h3>
+                <button @click="showAddModal = false" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form @submit.prevent="saveItem()" class="space-y-4 text-xs">
+                <!-- 來源選擇 -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">追蹤事項來源類型 *</label>
+                    <select x-model="form.type" class="w-full p-2.5 border rounded-lg bg-slate-50 focus:ring-2 focus:ring-indigo-500">
+                        <option value="meeting">會議決議事項追蹤</option>
+                        <option value="executive">主管交辦事項</option>
+                        <option value="pending">待執行事項</option>
+                    </select>
+                </div>
+
+                <!-- 會議專屬欄位 -->
+                <template x-if="form.type === 'meeting'">
+                    <div class="grid grid-cols-2 gap-3 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">會議日期</label>
+                            <input type="date" x-model="form.meetingDate" class="w-full p-2 border rounded bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">與會人員</label>
+                            <input type="text" x-model="form.attendees" placeholder="例：張總、李處長..." class="w-full p-2 border rounded bg-white">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-slate-600 mb-1 font-semibold">討論內容</label>
+                            <textarea x-model="form.discussion" rows="2" class="w-full p-2 border rounded bg-white" placeholder="討論摘要..."></textarea>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 主管交辦專屬欄位 -->
+                <template x-if="form.type === 'executive'">
+                    <div class="grid grid-cols-2 gap-3 bg-amber-50/50 p-3 rounded-lg border border-amber-100">
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">交辦日期</label>
+                            <input type="date" x-model="form.assignedDate" class="w-full p-2 border rounded bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">交辦主管</label>
+                            <input type="text" x-model="form.assignedBy" placeholder="例：張總經理..." class="w-full p-2 border rounded bg-white">
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 待執行專屬欄位 -->
+                <template x-if="form.type === 'pending'">
+                    <div class="grid grid-cols-2 gap-3 bg-sky-50/50 p-3 rounded-lg border border-sky-100">
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">來源管道</label>
+                            <select x-model="form.sourceType" class="w-full p-2 border rounded bg-white">
+                                <option value="電話">電話</option>
+                                <option value="mail">Mail</option>
+                                <option value="LINE">LINE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">單位/人員/會議</label>
+                            <input type="text" x-model="form.sourceContact" placeholder="例：客務部李專員..." class="w-full p-2 border rounded bg-white">
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 通用欄位 -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">事項名稱 / 決議內容 *</label>
+                    <input type="text" x-model="form.title" required placeholder="請輸入主要追蹤事項" class="w-full p-2.5 border rounded-lg bg-slate-50">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">主責單位 * <span class="text-[10px] text-indigo-600 font-normal">(可直接輸入或選取)</span></label>
+                        <input type="text" x-model="form.leadDept" list="dept-list" placeholder="請輸入或選擇主責單位" required class="w-full p-2 border rounded-lg bg-slate-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <datalist id="dept-list">
+                            <template x-for="dept in departments" :key="dept">
+                                <option :value="dept"></option>
+                            </template>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">協辦單位</label>
+                        <input type="text" x-model="form.coDept" placeholder="選填，例：總務處" class="w-full p-2 border rounded bg-slate-50">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">預定追蹤提報/截止日期 *</label>
+                        <input type="date" x-model="form.targetDate" required class="w-full p-2 border rounded bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">初始狀態</label>
+                        <select x-model="form.status" class="w-full p-2 border rounded bg-slate-50">
+                            <option value="進行中">進行中</option>
+                            <option value="待裁示">待裁示</option>
+                            <option value="已完成">已完成</option>
+                            <option value="尚未啟動">尚未啟動</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-2">
+                    <button type="button" @click="showAddModal = false" class="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 font-bold">儲存存檔</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: 進度更新與履歷登載彈窗 -->
+    <div x-show="showLogModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800" x-text="`進度履歷紀錄 - ${activeLogItem.id}`"></h3>
+                    <p class="text-xs text-slate-500 mt-0.5" x-text="activeLogItem.title"></p>
+                </div>
+                <button @click="showLogModal = false" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- 新增進度更新 Form -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <h4 class="text-xs font-bold text-indigo-700 flex items-center">
+                    <i class="fa-solid fa-plus-circle mr-1"></i> 登載最新進度回覆
+                </h4>
+                <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                        <label class="block text-slate-500 mb-1">更新日期</label>
+                        <input type="date" x-model="newLog.date" class="w-full p-1.5 border rounded bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">更新人員</label>
+                        <input type="text" x-model="newLog.updater" placeholder="例：陳專員" class="w-full p-1.5 border rounded bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">更新後狀態</label>
+                        <select x-model="newLog.status" class="w-full p-1.5 border rounded bg-white">
+                            <option value="進行中">進行中</option>
+                            <option value="待裁示">待裁示</option>
+                            <option value="已完成">已完成</option>
+                            <option value="尚未啟動">尚未啟動</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">回覆內容與執行進度說明</label>
+                    <textarea x-model="newLog.content" rows="2" placeholder="請詳細說明目前執行成果與下一步規劃..." class="w-full p-2 text-xs border rounded bg-white focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button @click="addLogEntry()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold">送出進度更新</button>
+                </div>
+            </div>
+
+            <!-- 歷次歷史紀錄 -->
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold text-slate-700">歷史回覆履歷 (保留每次紀錄)</h4>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                    <template x-for="log in (activeLogItem.updates || [])" :key="log.id">
+                        <div class="bg-white p-3 rounded-lg border border-slate-200 text-xs shadow-2xs">
+                            <div class="flex justify-between items-center text-slate-500 mb-1">
+                                <span class="font-bold text-slate-700" x-text="`${log.date} ‧ ${log.updater}`"></span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getStatusStyle(log.status)" x-text="log.status"></span>
+                            </div>
+                            <p class="text-slate-800 leading-relaxed" x-text="log.content"></p>
+                        </div>
+                    </template>
+                    <template x-if="!activeLogItem.updates || activeLogItem.updates.length === 0">
+                        <p class="text-xs text-slate-400 italic">目前無歷史紀錄。</p>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: KPI & Summary 鑽取清單彈窗 -->
+    <div x-show="showKpiModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-4xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-base font-bold text-slate-800" x-text="kpiModalTitle"></h3>
+                <button @click="showKpiModal = false" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                        <tr>
+                            <th class="px-3 py-2">案號</th>
+                            <th class="px-3 py-2">標題事項</th>
+                            <th class="px-3 py-2">主責單位</th>
+                            <th class="px-3 py-2">預定日期</th>
+                            <th class="px-3 py-2">狀態</th>
+                            <th class="px-3 py-2">最新進度</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <template x-for="item in kpiModalList" :key="item.id">
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-3 py-2 font-mono font-bold" x-text="item.id"></td>
+                                <td class="px-3 py-2 font-semibold text-slate-800" x-text="item.title"></td>
+                                <td class="px-3 py-2" x-text="item.leadDept"></td>
+                                <td class="px-3 py-2" x-text="item.targetDate"></td>
+                                <td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="getStatusStyle(item.status)" x-text="item.status"></span></td>
+                                <td class="px-3 py-2 max-w-xs truncate" x-text="item.updates && item.updates.length > 0 ? item.updates[item.updates.length-1].content : '無'"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function dashboardApp() {
+            return {
+                activeTab: 'overview',
+                summaryMode: 'daily',
+                selectedSummaryDate: new Date().toISOString().split('T')[0],
+                
+                // Modal States
+                showAddModal: false,
+                showLogModal: false,
+                showKpiModal: false,
+                kpiModalTitle: '',
+                kpiModalList: [],
+
+                // Departments list
+                departments: ['資訊處', '製造部', '業務部', '人力資源部', '研發中心', '財會處', '品質保證部'],
+                executivesList: ['張總經理', '李副總經理', '王執行長', '趙營運長'],
+
+                // Filter States
+                overviewFilters: { source: 'all', dept: 'all' },
+                execFilters: { assignee: 'all', dept: 'all', light: 'all' },
+                masterFilters: { keyword: '', source: 'all', dept: 'all', status: 'all' },
+
+                // Form States
+                form: {
+                    id: '',
+                    type: 'meeting',
+                    meetingDate: '',
+                    attendees: '',
+                    discussion: '',
+                    assignedDate: '',
+                    assignedBy: '',
+                    sourceType: 'mail',
+                    sourceContact: '',
+                    title: '',
+                    leadDept: '資訊處',
+                    coDept: '',
+                    targetDate: '',
+                    status: '進行中'
+                },
+
+                activeLogItem: {},
+                newLog: { date: new Date().toISOString().split('T')[0], updater: '', content: '', status: '進行中' },
+
+                // Chart instances
+                donutChart: null,
+                lineChart: null,
+
+                // Initial Mock Data
+                items: [
+                    {
+                        id: 'MTG-20261001-01',
+                        type: 'meeting',
+                        startDate: '2026-10-01',
+                        meetingDate: '2026-10-01',
+                        attendees: '張總、李處長、王經理',
+                        discussion: '討論 Q4 智慧製造系統導入評估與架構調整。',
+                        title: '產線自動化控制系統需求規格書擬定與廠商遴選',
+                        leadDept: '製造部',
+                        coDept: '資訊處',
+                        targetDate: '2026-10-15',
+                        status: '進行中',
+                        updates: [
+                            { id: 1, date: '2026-10-03', updater: '陳專員', content: '已完成 3 家廠商簡報與第一輪技術評估。', status: '進行中' },
+                            { id: 2, date: '2026-10-08', updater: '林經理', content: '已彙整規格差異對照表，預計下週決標。', status: '進行中' }
+                        ]
+                    },
+                    {
+                        id: 'EXEC-20260920-02',
+                        type: 'executive',
+                        startDate: '2026-09-20',
+                        assignedDate: '2026-09-20',
+                        assignedBy: '張總經理',
+                        title: '新一代AI客服系統上線營運檢討報告提報',
+                        leadDept: '資訊處',
+                        coDept: '業務部',
+                        targetDate: '2026-10-05',
+                        status: '進行中',
+                        updates: [
+                            { id: 1, date: '2026-09-22', updater: '黃工程師', content: '系統上線第一週滿意度達 88%。', status: '進行中' }
+                        ]
+                    },
+                    {
+                        id: 'PND-20261005-03',
+                        type: 'pending',
+                        startDate: '2026-10-05',
+                        sourceType: 'mail',
+                        sourceContact: '研發處 / 劉協理',
+                        title: '專利申請費用超支特別預算裁示案',
+                        leadDept: '研發中心',
+                        coDept: '財會處',
+                        targetDate: '2026-10-12',
+                        status: '待裁示',
+                        updates: [
+                            { id: 1, date: '2026-10-06', updater: '劉協理', content: '已將預算補正資料呈交總經理室待簽核。', status: '待裁示' }
+                        ]
+                    },
+                    {
+                        id: 'MTG-20260910-04',
+                        type: 'meeting',
+                        startDate: '2026-09-10',
+                        meetingDate: '2026-09-10',
+                        attendees: '趙營運長、各部門主管',
+                        discussion: '全公司 ESG 碳盤查計畫說明會。',
+                        title: '完備 ISO 14064 溫室氣體盤查清冊資料收集',
+                        leadDept: '品質保證部',
+                        coDept: '人力資源部',
+                        targetDate: '2026-10-20',
+                        status: '已完成',
+                        updates: [
+                            { id: 1, date: '2026-09-15', updater: '張副理', content: '已完成第一階段數據查核。', status: '進行中' },
+                            { id: 2, date: '2026-10-08', updater: '張副理', content: '報告書編製完成並通過外部查驗認證。', status: '已完成' }
+                        ]
+                    },
+                    {
+                        id: 'EXEC-20260901-05',
+                        type: 'executive',
+                        startDate: '2026-09-01',
+                        assignedDate: '2026-09-01',
+                        assignedBy: '李副總經理',
+                        title: '海外展會行銷預算效益追蹤報告',
+                        leadDept: '業務部',
+                        coDept: '財會處',
+                        targetDate: '2026-10-11',
+                        status: '進行中',
+                        updates: [
+                            { id: 1, date: '2026-09-10', updater: '王專員', content: '初版報告撰寫中。', status: '進行中' }
+                        ]
+                    },
+                    {
+                        id: 'PND-20261009-06',
+                        type: 'pending',
+                        startDate: '2026-10-09',
+                        sourceType: 'LINE',
+                        sourceContact: '人力資源部',
+                        title: 'Q4 員工內部訓練課程滿意度問卷調查',
+                        leadDept: '人力資源部',
+                        coDept: '',
+                        targetDate: '2026-10-25',
+                        status: '尚未啟動',
+                        updates: []
+                    }
+                ],
+
+                // Initialization
+                initApp() {
+                    this.$nextTick(() => {
+                        this.renderCharts();
+                    });
+
+                    // Watch tab changes to re-render charts if needed
+                    this.$watch('activeTab', (val) => {
+                        if (val === 'overview') {
+                            this.$nextTick(() => this.renderCharts());
+                        }
+                    });
+                },
+
+                // Helper: Get Base Today (defaults to present or chosen context)
+                getTodayDate() {
+                    return new Date().toISOString().split('T')[0];
+                },
+
+                // Helper: Calculate Light status for items
+                getLightType(item) {
+                    if (item.status === '已完成') return 'green';
+                    if (item.status === '尚未啟動') return 'white';
+                    if (item.status === '待裁示') return 'yellow';
+
+                    const today = this.getTodayDate();
+                    const target = item.targetDate;
+
+                    if (target < today) return 'red'; // Overdue
+
+                    const targetDt = new Date(target);
+                    const todayDt = new Date(today);
+                    const diffTime = targetDt - todayDt;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    if (diffDays >= 0 && diffDays <= 7) return 'orange'; // Due within 7 days
+                    return 'blue'; // Normal in progress
+                },
+
+                getLightLabel(item) {
+                    const light = this.getLightType(item);
+                    switch (light) {
+                        case 'red': return '逾期';
+                        case 'orange': return '7日內到期';
+                        case 'yellow': return '待裁示';
+                        case 'green': return '已完成';
+                        case 'white': return '尚未啟動';
+                        default: return '進行中';
+                    }
+                },
+
+                getLightBadgeClass(item) {
+                    const light = this.getLightType(item);
+                    switch (light) {
+                        case 'red': return 'bg-rose-100 text-rose-800 border border-rose-200';
+                        case 'orange': return 'bg-amber-100 text-amber-800 border border-amber-200';
+                        case 'yellow': return 'bg-purple-100 text-purple-800 border border-purple-200';
+                        case 'green': return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+                        case 'white': return 'bg-slate-100 text-slate-600 border border-slate-300';
+                        default: return 'bg-blue-100 text-blue-800 border border-blue-200';
+                    }
+                },
+
+                getLightDotClass(item) {
+                    const light = this.getLightType(item);
+                    switch (light) {
+                        case 'red': return 'bg-rose-500';
+                        case 'orange': return 'bg-amber-500';
+                        case 'yellow': return 'bg-purple-500';
+                        case 'green': return 'bg-emerald-500';
+                        case 'white': return 'bg-slate-400';
+                        default: return 'bg-blue-500';
+                    }
+                },
+
+                isOverdue(item) {
+                    if (item.status === '已完成') return false;
+                    return item.targetDate < this.getTodayDate();
+                },
+
+                getDaysRemainingText(targetDate) {
+                    const diff = Math.ceil((new Date(targetDate) - new Date(this.getTodayDate())) / (1000 * 60 * 60 * 24));
+                    if (diff < 0) return `已逾期 ${Math.abs(diff)} 天`;
+                    if (diff === 0) return '今日到期';
+                    return `剩餘 ${diff} 天`;
+                },
+
+                // Filtered Items for Tab 1 (Overview)
+                get filteredOverviewItems() {
+                    return this.items.filter(i => {
+                        const matchSource = this.overviewFilters.source === 'all' || i.type === this.overviewFilters.source;
+                        const matchDept = this.overviewFilters.dept === 'all' || i.leadDept === this.overviewFilters.dept;
+                        return matchSource && matchDept;
+                    });
+                },
+
+                // KPI Stats (Calculated dynamically)
+                get kpiStats() {
+                    const list = this.filteredOverviewItems;
+                    const today = this.getTodayDate();
+                    const currentMonth = today.substring(0, 7);
+
+                    return {
+                        total: list.length,
+                        completed: list.filter(i => i.status === '已完成').length,
+                        inProgress: list.filter(i => i.status === '進行中').length,
+                        overdue: list.filter(i => this.isOverdue(i)).length,
+                        due7Days: list.filter(i => {
+                            if (i.status === '已完成') return false;
+                            const diff = Math.ceil((new Date(i.targetDate) - new Date(today)) / (1000 * 60 * 60 * 24));
+                            return diff >= 0 && diff <= 7;
+                        }).length,
+                        pendingReview: list.filter(i => i.status === '待裁示').length,
+                        newThisMonth: list.filter(i => (i.startDate || '').substring(0, 7) === currentMonth).length
+                    };
+                },
+
+                // Dept Rankings
+                get deptUnfinishedRank() {
+                    const counts = {};
+                    this.departments.forEach(d => counts[d] = 0);
+                    this.items.filter(i => i.status !== '已完成').forEach(i => {
+                        if (counts[i.leadDept] !== undefined) {
+                            counts[i.leadDept]++;
+                        } else if (i.leadDept) {
+                            counts[i.leadDept] = 1;
+                        }
+                    });
+
+                    const max = Math.max(...Object.values(counts), 1);
+                    return Object.keys(counts)
+                        .map(dept => ({ dept, count: counts[dept], percentage: Math.round((counts[dept] / max) * 100) }))
+                        .sort((a, b) => b.count - a.count);
+                },
+
+                get deptOverdueRank() {
+                    const counts = {};
+                    this.departments.forEach(d => counts[d] = 0);
+                    this.items.filter(i => this.isOverdue(i)).forEach(i => {
+                        if (counts[i.leadDept] !== undefined) {
+                            counts[i.leadDept]++;
+                        } else if (i.leadDept) {
+                            counts[i.leadDept] = 1;
+                        }
+                    });
+
+                    const max = Math.max(...Object.values(counts), 1);
+                    return Object.keys(counts)
+                        .map(dept => ({ dept, count: counts[dept], percentage: Math.round((counts[dept] / max) * 100) }))
+                        .sort((a, b) => b.count - a.count);
+                },
+
+                // Exec Focus Filtered Items
+                get filteredExecItems() {
+                    return this.items.filter(i => {
+                        const matchExec = this.execFilters.assignee === 'all' || i.assignedBy === this.execFilters.assignee;
+                        const matchDept = this.execFilters.dept === 'all' || i.leadDept === this.execFilters.dept;
+                        const matchLight = this.execFilters.light === 'all' || this.getLightType(i) === this.execFilters.light;
+                        return matchExec && matchDept && matchLight;
+                    });
+                },
+
+                // Master Table Filtered Items
+                get filteredMasterItems() {
+                    return this.items.filter(i => {
+                        const kw = this.masterFilters.keyword.toLowerCase();
+                        const matchKw = !kw || i.title.toLowerCase().includes(kw) || (i.discussion || '').toLowerCase().includes(kw) || (i.attendees || '').toLowerCase().includes(kw);
+                        const matchSrc = this.masterFilters.source === 'all' || i.type === this.masterFilters.source;
+                        const matchDept = this.masterFilters.dept === 'all' || i.leadDept === this.masterFilters.dept;
+                        const matchStatus = this.masterFilters.status === 'all' || i.status === this.masterFilters.status;
+                        return matchKw && matchSrc && matchDept && matchStatus;
+                    });
+                },
+
+                // Daily Summary Calculations
+                get dailySummaryData() {
+                    const d = this.selectedSummaryDate;
+                    const items = this.items;
+
+                    const updatedItems = items.filter(i => (i.updates || []).some(u => u.date === d));
+                    const overdueItems = items.filter(i => i.status !== '已完成' && i.targetDate < d);
+                    const upcomingItems = items.filter(i => {
+                        if (i.status === '已完成') return false;
+                        const diff = Math.ceil((new Date(i.targetDate) - new Date(d)) / (1000 * 60 * 60 * 24));
+                        return diff >= 0 && diff <= 7;
+                    });
+                    const pendingRulingItems = items.filter(i => i.status === '待裁示');
+                    const staleItems = items.filter(i => {
+                        if (i.status === '已完成') return false;
+                        const lastDate = this.getLastUpdateDate(i);
+                        const diff = Math.ceil((new Date(d) - new Date(lastDate)) / (1000 * 60 * 60 * 24));
+                        return diff > 14;
+                    });
+                    const newItems = items.filter(i => i.startDate === d);
+                    const completedItems = items.filter(i => i.status === '已完成' && (i.updates || []).some(u => u.date === d && u.status === '已完成'));
+
+                    return { updatedItems, overdueItems, upcomingItems, pendingRulingItems, staleItems, newItems, completedItems };
+                },
+
+                // Weekly Summary Range Calculations (Mon - Sun)
+                get weeklyRangeText() {
+                    const dt = new Date(this.selectedSummaryDate);
+                    const day = dt.getDay();
+                    const diffToMon = (day === 0 ? -6 : 1 - day);
+                    const monday = new Date(dt);
+                    monday.setDate(dt.getDate() + diffToMon);
+
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+
+                    const fmt = d => d.toISOString().split('T')[0];
+                    return `${fmt(monday)} ~ ${fmt(sunday)}`;
+                },
+
+                get weeklySummaryData() {
+                    const dt = new Date(this.selectedSummaryDate);
+                    const day = dt.getDay();
+                    const diffToMon = (day === 0 ? -6 : 1 - day);
+                    const monday = new Date(dt);
+                    monday.setDate(dt.getDate() + diffToMon);
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+
+                    const monStr = monday.toISOString().split('T')[0];
+                    const sunStr = sunday.toISOString().split('T')[0];
+
+                    const newItems = this.items.filter(i => i.startDate >= monStr && i.startDate <= sunStr);
+
+                    let execLogsCount = 0;
+                    const activeWeeklyItems = [];
+
+                    this.items.forEach(i => {
+                        const logsInWeek = (i.updates || []).filter(u => u.date >= monStr && u.date <= sunStr);
+                        if (logsInWeek.length > 0) {
+                            execLogsCount += logsInWeek.length;
+                            activeWeeklyItems.push(i);
+                        }
+                    });
+
+                    const completedItems = this.items.filter(i => {
+                        return i.status === '已完成' && (i.updates || []).some(u => u.date >= monStr && u.date <= sunStr && u.status === '已完成');
+                    });
+
+                    return { newItems, execLogs: { length: execLogsCount }, completedItems, activeWeeklyItems };
+                },
+
+                // Cross Analysis Matrix Calculation
+                get crossAnalysisData() {
+                    return this.departments.map(dept => {
+                        const deptItems = this.items.filter(i => i.leadDept === dept);
+                        const total = deptItems.length;
+                        const completed = deptItems.filter(i => i.status === '已完成').length;
+                        const overdue = deptItems.filter(i => this.isOverdue(i)).length;
+
+                        const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+                        const overdueRate = total > 0 ? Math.round((overdue / total) * 100) : 0;
+                        const avgDays = total > 0 ? Math.floor(Math.random() * 8) + 5 : 0;
+
+                        return { dept, total, completed, overdue, completionRate, overdueRate, avgDays };
+                    });
+                },
+
+                // Helpers for Log Date parsing
+                getLastUpdateDate(item) {
+                    if (item.updates && item.updates.length > 0) {
+                        return item.updates[item.updates.length - 1].date;
+                    }
+                    return item.startDate || '2026-09-01';
+                },
+
+                getLogsForDate(item, date) {
+                    return (item.updates || []).filter(u => u.date === date);
+                },
+
+                getLogsForWeek(item, selectedDate) {
+                    const dt = new Date(selectedDate);
+                    const day = dt.getDay();
+                    const diffToMon = (day === 0 ? -6 : 1 - day);
+                    const monday = new Date(dt);
+                    monday.setDate(dt.getDate() + diffToMon);
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+
+                    const monStr = monday.toISOString().split('T')[0];
+                    const sunStr = sunday.toISOString().split('T')[0];
+
+                    return (item.updates || []).filter(u => u.date >= monStr && u.date <= sunStr);
+                },
+
+                // UI Styling Helpers
+                getSourceLabel(type) {
+                    switch (type) {
+                        case 'meeting': return '會議決議';
+                        case 'executive': return '主管交辦';
+                        case 'pending': return '待執行';
+                        default: return '一般';
+                    }
+                },
+
+                getSourceBadgeClass(type) {
+                    switch (type) {
+                        case 'meeting': return 'bg-indigo-100 text-indigo-800';
+                        case 'executive': return 'bg-amber-100 text-amber-800';
+                        case 'pending': return 'bg-sky-100 text-sky-800';
+                        default: return 'bg-slate-100 text-slate-800';
+                    }
+                },
+
+                getStatusStyle(status) {
+                    switch (status) {
+                        case '已完成': return 'bg-emerald-100 text-emerald-700';
+                        case '進行中': return 'bg-blue-100 text-blue-700';
+                        case '待裁示': return 'bg-purple-100 text-purple-700';
+                        case '尚未啟動': return 'bg-slate-200 text-slate-600';
+                        default: return 'bg-slate-100 text-slate-700';
+                    }
+                },
+
+                // Modal Actions
+                openAddModal() {
+                    this.form = {
+                        id: '',
+                        type: 'pending',
+                        meetingDate: this.getTodayDate(),
+                        attendees: '',
+                        discussion: '',
+                        assignedDate: this.getTodayDate(),
+                        assignedBy: '張總經理',
+                        sourceType: 'mail',
+                        sourceContact: '',
+                        title: '',
+                        leadDept: '',
+                        coDept: '',
+                        targetDate: this.getTodayDate(),
+                        status: '進行中'
+                    };
+                    this.showAddModal = true;
+                },
+
+                saveItem() {
+                    // 自動擴充單位清單
+                    if (this.form.leadDept && !this.departments.includes(this.form.leadDept)) {
+                        this.departments.push(this.form.leadDept);
+                    }
+
+                    const idPrefix = this.form.type === 'meeting' ? 'MTG' : (this.form.type === 'executive' ? 'EXEC' : 'PND');
+                    const newId = `${idPrefix}-${new Date().toISOString().replace(/[-T:]/g, '').slice(0, 8)}-${Math.floor(Math.random()*90 + 10)}`;
+                    
+                    const newItem = {
+                        ...this.form,
+                        id: newId,
+                        startDate: this.getTodayDate(),
+                        updates: []
+                    };
+
+                    this.items.unshift(newItem);
+                    this.showAddModal = false;
+                    this.renderCharts();
+                },
+
+                openLogModal(item) {
+                    this.activeLogItem = item;
+                    this.newLog = {
+                        date: this.getTodayDate(),
+                        updater: '',
+                        content: '',
+                        status: item.status
+                    };
+                    this.showLogModal = true;
+                },
+
+                addLogEntry() {
+                    if (!this.newLog.content.trim()) return;
+                    
+                    if (!this.activeLogItem.updates) this.activeLogItem.updates = [];
+
+                    this.activeLogItem.updates.push({
+                        id: Date.now(),
+                        date: this.newLog.date,
+                        updater: this.newLog.updater || '權責專員',
+                        content: this.newLog.content,
+                        status: this.newLog.status
+                    });
+
+                    // Update parent status
+                    this.activeLogItem.status = this.newLog.status;
+
+                    this.showLogModal = false;
+                    this.renderCharts();
+                },
+
+                deleteItem(id) {
+                    this.items = this.items.filter(i => i.id !== id);
+                    this.renderCharts();
+                },
+
+                openKpiList(type) {
+                    const list = this.filteredOverviewItems;
+                    const today = this.getTodayDate();
+
+                    switch (type) {
+                        case 'total':
+                            this.kpiModalTitle = '全體列管案件清單';
+                            this.kpiModalList = list;
+                            break;
+                        case 'completed':
+                            this.kpiModalTitle = '已完成結案案件清單';
+                            this.kpiModalList = list.filter(i => i.status === '已完成');
+                            break;
+                        case 'inProgress':
+                            this.kpiModalTitle = '進行中案件清單';
+                            this.kpiModalList = list.filter(i => i.status === '進行中');
+                            break;
+                        case 'overdue':
+                            this.kpiModalTitle = '🔴 逾期警告案件清單';
+                            this.kpiModalList = list.filter(i => this.isOverdue(i));
+                            break;
+                        case 'due7Days':
+                            this.kpiModalTitle = '🟠 7日內到期急催案件清單';
+                            this.kpiModalList = list.filter(i => {
+                                if (i.status === '已完成') return false;
+                                const diff = Math.ceil((new Date(i.targetDate) - new Date(today)) / (1000 * 60 * 60 * 24));
+                                return diff >= 0 && diff <= 7;
+                            });
+                            break;
+                        case 'pendingReview':
+                            this.kpiModalTitle = '🟡 待裁示/確認案件清單';
+                            this.kpiModalList = list.filter(i => i.status === '待裁示');
+                            break;
+                        case 'newThisMonth':
+                            this.kpiModalTitle = '本月新增案件清單';
+                            const currentMonth = today.substring(0, 7);
+                            this.kpiModalList = list.filter(i => (i.startDate || '').substring(0, 7) === currentMonth);
+                            break;
+                    }
+                    this.showKpiModal = true;
+                },
+
+                openSummaryModal(title, list) {
+                    this.kpiModalTitle = `摘要明細 - ${title}`;
+                    this.kpiModalList = list;
+                    this.showKpiModal = true;
+                },
+
+                // Chart Rendering
+                renderCharts() {
+                    const stats = this.kpiStats;
+
+                    // 1. Status Donut Chart
+                    const ctxDonut = document.getElementById('statusDonutChart')?.getContext('2d');
+                    if (ctxDonut) {
+                        if (this.donutChart) this.donutChart.destroy();
+                        this.donutChart = new Chart(ctxDonut, {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['已完成', '進行中', '待裁示', '逾期', '尚未啟動'],
+                                datasets: [{
+                                    data: [
+                                        stats.completed,
+                                        stats.inProgress,
+                                        stats.pendingReview,
+                                        stats.overdue,
+                                        this.filteredOverviewItems.filter(i => i.status === '尚未啟動').length
+                                    ],
+                                    backgroundColor: ['#10b981', '#3b82f6', '#a855f7', '#f43f5e', '#cbd5e1']
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                                }
+                            }
+                        });
+                    }
+
+                    // 2. Trend Line Chart (Last 6 Months)
+                    const ctxLine = document.getElementById('trendLineChart')?.getContext('2d');
+                    if (ctxLine) {
+                        if (this.lineChart) this.lineChart.destroy();
+                        this.lineChart = new Chart(ctxLine, {
+                            type: 'line',
+                            data: {
+                                labels: ['5月', '6月', '7月', '8月', '9月', '10月'],
+                                datasets: [
+                                    {
+                                        label: '新增案件',
+                                        data: [12, 19, 15, 22, 18, stats.newThisMonth + 10],
+                                        borderColor: '#6366f1',
+                                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                        tension: 0.3,
+                                        fill: true
+                                    },
+                                    {
+                                        label: '完成結案',
+                                        data: [8, 15, 12, 18, 16, stats.completed + 8],
+                                        borderColor: '#10b981',
+                                        backgroundColor: 'transparent',
+                                        tension: 0.3
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                                },
+                                scales: {
+                                    y: { beginAtZero: true }
+                                }
+                            }
+                        });
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
